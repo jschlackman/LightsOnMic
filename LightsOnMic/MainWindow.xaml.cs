@@ -515,6 +515,7 @@ namespace LightsOnMic
         private void SettingsMenuItem_Click(object sender, EventArgs e)
         {
             this.Show();
+            WindowState = storedWindowState;
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -583,6 +584,24 @@ namespace LightsOnMic
         private void BtnTest_Click(object sender, RoutedEventArgs e)
         {
             txtDebugLog.Text += "Found tray icons:\n" + CheckNotificationIcons();
+        }
+
+        /// <summary>
+        /// Stores the windows state prior to being minimized to the notification area
+        /// </summary>
+        private WindowState storedWindowState = WindowState.Normal;
+
+        private void Window_StateChanged(object sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized)
+            {
+                Hide();
+            }
+            else
+            {
+                storedWindowState = WindowState;
+            }
+
         }
     }
 }
