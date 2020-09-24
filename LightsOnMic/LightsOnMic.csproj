@@ -38,6 +38,9 @@
     <StartupObject>
     </StartupObject>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="LightFX, Version=4.0.49.0, Culture=neutral, PublicKeyToken=bebb3c8816410241, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
