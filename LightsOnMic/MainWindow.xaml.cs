@@ -83,12 +83,18 @@ namespace LightsOnMic
         /// argb value of color to use when microphone is not in use
         /// </summary>
         public int MicNotInUse;
+        /// <summary>
+        /// argb value of color to use when session is locked
+        /// </summary>
+        public int SessionLocked;
+
 
         public StatusColors()
         {
             // Set default colors
             MicInUse = System.Drawing.Color.Red.ToArgb();
             MicNotInUse = System.Drawing.Color.FromArgb(0, 190, 0).ToArgb();
+            SessionLocked = System.Drawing.Color.Yellow.ToArgb();
         }
 
     }
@@ -249,6 +255,14 @@ namespace LightsOnMic
             SetSomeLights(Colors.MicNotInUse.ToLFX());
         }
 
+        /// <summary>
+        /// Set AlienFX lights to locked status
+        /// </summary>
+        public void SetLocked()
+        {
+            SetSomeLights(Colors.SessionLocked.ToLFX());
+        }
+
     }
 
     public static class ColorHelper
@@ -277,16 +291,8 @@ namespace LightsOnMic
 
     }
 
-
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    public static class ShellEvents
     {
-        /// <summary>
-        /// AlienFX light controller object
-        /// </summary>
-        //private static LightFXController lightFX;
         /// <summary>
         /// Automation object for Shell_TrayWnd
         /// </summary>
@@ -295,16 +301,6 @@ namespace LightsOnMic
         /// Automation object for the User Promoted Notification Area
         /// </summary>
         private static AutomationElement userArea;
-
-        /// <summary>
-        /// Indicate if the application should fully exit when closing a window.
-        /// </summary>
-        private bool ReallyExit = false;
-
-        /// <summary>
-        /// Notification icon for this application
-        /// </summary>
-        private static System.Windows.Forms.NotifyIcon notifyIcon;
 
         /// <summary>
         /// Enumerate the notification icons in a UI Automation object
@@ -326,10 +322,58 @@ namespace LightsOnMic
             }
         }
 
+        /// <summary>
+        /// Event handler object for subscribing to changes to the notification icons
+        /// </summary>
+        static StructureChangedEventHandler trayEventHandler;
+
+
+        /// <summary>
+        /// Dispose of references and hooks to the shell tray
+        /// </summary>
+        public static void DisposeTrayHooks()
+        {
+            if (trayEventHandler != null)
+            {
+                Automation.RemoveStructureChangedEventHandler(shellTray, trayEventHandler);
+            }
+        }
+
+        /// <summary>
+        /// Initialise references and hooks to elements of the tray window (yes, the tray, not the just the notification area which is PART of the shell tray).
+        /// </summary>
+        public static void InitTrayHooks(StructureChangedEventHandler eventHandler)
+        {
+            userArea = AutomationElement.RootElement.Find("User Promoted Notification Area");
+            shellTray = userArea.GetTopLevelElement();
+
+            Automation.AddStructureChangedEventHandler(shellTray, TreeScope.Descendants, trayEventHandler = eventHandler);
+        }
+    }
+
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+
+        /// <summary>
+        /// Indicate if the application should fully exit when closing a window.
+        /// </summary>
+        private bool ReallyExit = false;
+
+        /// <summary>
+        /// Notification icon for this application
+        /// </summary>
+        private static System.Windows.Forms.NotifyIcon notifyIcon;
+
         public MainWindow()
         {
             InitializeComponent();
-            InitTrayHooks();
+
+            ShellEvents.InitTrayHooks(new StructureChangedEventHandler(OnStructureChanged));
+            SystemEvents.SessionSwitch += new SessionSwitchEventHandler(OnSessionSwitch);
+
             InitNotifyIcon();
 
             if (Settings.Default.alfxSettings == null)
@@ -341,12 +385,23 @@ namespace LightsOnMic
 
             btnMicInUse.Background = Settings.Default.alfxSettings.Colors.MicInUse.ToBrush();
             btnMicNotInUse.Background = Settings.Default.alfxSettings.Colors.MicNotInUse.ToBrush();
+            btnLocked.Background = Settings.Default.alfxSettings.Colors.SessionLocked.ToBrush();
         }
 
-        /// <summary>
-        /// Event handler object for subscribing to changes to the notification icons
-        /// </summary>
-        static StructureChangedEventHandler trayEventHandler;
+
+        public void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
+        {
+            switch (e.Reason)
+            {
+                case SessionSwitchReason.SessionUnlock:
+                case SessionSwitchReason.ConsoleConnect:
+                    CheckNotificationIcons();
+                break;
+                default:
+                    Settings.Default.alfxSettings.SetLocked();
+                break;
+            }
+        }
 
         /// <summary>
         /// Handles structure-changed events. If a new element has been added or removed, makes
@@ -360,31 +415,6 @@ namespace LightsOnMic
                 CheckNotificationIcons();
             }
         }
-
-        /// <summary>
-        /// Dispose of references and hooks to the shell tray
-        /// </summary>
-        private void DisposeTrayHooks()
-        {
-            if (trayEventHandler != null)
-            {
-                Automation.RemoveStructureChangedEventHandler(shellTray, trayEventHandler);
-            }
-        }
-
-        /// <summary>
-        /// Initialise references and hooks to elements of the tray window (yes, the tray, not the just the notification area which is PART of the shell tray).
-        /// </summary>
-        private void InitTrayHooks()
-        {
-            userArea = AutomationElement.RootElement.Find("User Promoted Notification Area");
-            shellTray = userArea.GetTopLevelElement();
-
-            Automation.AddStructureChangedEventHandler(shellTray, TreeScope.Descendants, trayEventHandler = new StructureChangedEventHandler(OnStructureChanged));
-        }
-
-
-
 
         /// <summary>
         /// Initialise the notificaion icon for this application
@@ -441,16 +471,16 @@ namespace LightsOnMic
         {
             string iconNames = "";
             
-            foreach (var icon in EnumNotificationIcons())
+            // Query text labels of all notification icons
+            foreach (var icon in ShellEvents.EnumNotificationIcons())
             {
-                var name = icon.GetCurrentPropertyValue(AutomationElement.NameProperty)
-                           as string;
+                var name = icon.GetCurrentPropertyValue(AutomationElement.NameProperty) as string;
 
+                // Append to list if not blank
                 if (name != "")
                 {
                     iconNames += name + '\n';
                 }
-
             }
 
             if (iconNames.Contains(" is using your microphone\n"))
@@ -470,12 +500,10 @@ namespace LightsOnMic
 
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void BtnApply_Click(object sender, RoutedEventArgs e)
         {
             Settings.Default.Save();
-
-            txtDebugLog.Text += "Found tray icons:\n" + CheckNotificationIcons();
-
+            CheckNotificationIcons();
         }
 
         private void ExitMenuItem_Click(object sender, EventArgs e)
@@ -504,7 +532,7 @@ namespace LightsOnMic
         private void Window_Closed(object sender, EventArgs e)
         {
             Settings.Default.alfxSettings.ShutdownHardware();
-            DisposeTrayHooks();
+            ShellEvents.DisposeTrayHooks();
             notifyIcon.Dispose();
         }
 
@@ -535,6 +563,26 @@ namespace LightsOnMic
                 Settings.Default.alfxSettings.Colors.MicNotInUse = colorDialog.Color.ToArgb();
                 btnMicNotInUse.Background = Settings.Default.alfxSettings.Colors.MicNotInUse.ToBrush();
             }
+        }
+
+        private void BtnLocked_Click(object sender, RoutedEventArgs e)
+        {
+            ColorDialog colorDialog = new ColorDialog()
+            {
+                Color = System.Drawing.Color.FromArgb(Settings.Default.alfxSettings.Colors.SessionLocked),
+
+            };
+
+            if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                Settings.Default.alfxSettings.Colors.SessionLocked = colorDialog.Color.ToArgb();
+                btnLocked.Background = Settings.Default.alfxSettings.Colors.SessionLocked.ToBrush();
+            }
+        }
+
+        private void BtnTest_Click(object sender, RoutedEventArgs e)
+        {
+            txtDebugLog.Text += "Found tray icons:\n" + CheckNotificationIcons();
         }
     }
 }

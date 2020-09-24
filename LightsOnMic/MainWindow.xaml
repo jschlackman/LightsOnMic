@@ -5,18 +5,32 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LightsOnMic"
         mc:Ignorable="d"
-        Title="LightsOnMic Settings" Height="390.441" Width="610.074" Closing="Window_Closing" Closed="Window_Closed" Visibility="Hidden" Icon="AppIcon.ico">
+        Title="LightsOnMic Settings" Height="292.264" Width="387.289" Closing="Window_Closing" Closed="Window_Closed" Icon="AppIcon.ico">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="149*"/>
             <ColumnDefinition Width="153*"/>
         </Grid.ColumnDefinitions>
-        <TextBox x:Name="txtDebugLog" Margin="0,34,11,9.8" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" HorizontalAlignment="Right" Width="233" Grid.Column="1" />
-        <Button x:Name="btnApply" Content="Apply" Margin="0,128,29.903,0" VerticalAlignment="Top" Click="Button_Click" HorizontalAlignment="Right" Width="75"/>
-        <Button x:Name="btnMicInUse" Content="" HorizontalAlignment="Left" Margin="193,34,0,0" VerticalAlignment="Top" Width="75" Click="BtnMicInUse_Click" />
-        <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,35,0,0" TextWrapping="Wrap" Text="Light color when mic in use:" VerticalAlignment="Top"/>
-        <Button x:Name="btnMicNotInUse" Content="" HorizontalAlignment="Left" Margin="193,58,0,0" VerticalAlignment="Top" Width="75"  Click="BtnMicNotInUse_Click"/>
-        <TextBlock x:Name="textBlock1" HorizontalAlignment="Left" Margin="10,59,0,0" TextWrapping="Wrap" Text="Light color when mic not in use:" VerticalAlignment="Top"/>
+        <TabControl x:Name="tabControl" Grid.ColumnSpan="2" Margin="10,10,9.8,9.8">
+            <TabItem Header="Light Settings">
+                <Grid Background="#FFE5E5E5">
+                    <Button x:Name="btnApply" Content="Apply" Margin="0,0,10.2,10.4" Click="BtnApply_Click" Height="19" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="75"/>
+                    <Button x:Name="btnMicInUse" Content="" HorizontalAlignment="Left" Margin="193,34,0,0" VerticalAlignment="Top" Width="75" Click="BtnMicInUse_Click" />
+                    <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,35,0,0" TextWrapping="Wrap" Text="Light color when mic in use:" VerticalAlignment="Top"/>
+                    <Button x:Name="btnMicNotInUse" Content="" HorizontalAlignment="Left" Margin="193,58,0,0" VerticalAlignment="Top" Width="75"  Click="BtnMicNotInUse_Click"/>
+                    <TextBlock x:Name="textBlock1" HorizontalAlignment="Left" Margin="10,59,0,0" TextWrapping="Wrap" Text="Light color when mic not in use:" VerticalAlignment="Top"/>
+                    <Button x:Name="btnLocked" Content="" HorizontalAlignment="Left" Margin="193,82,0,0" VerticalAlignment="Top" Width="75" Click="BtnLocked_Click"/>
+                    <TextBlock x:Name="textBlock2" HorizontalAlignment="Left" Margin="10,84,0,0" TextWrapping="Wrap" Text="Light color when console locked:" VerticalAlignment="Top"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Advanced">
+                <Grid Background="#FFE5E5E5">
+                    <TextBox x:Name="txtDebugLog" Margin="10,31,90.2,9.4" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" IsReadOnly="True" />
+                    <TextBlock x:Name="textBlock3" HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" Text="Debug log:" VerticalAlignment="Top"/>
+                    <Button x:Name="btnTest" Content="Test Icons" HorizontalAlignment="Left" Margin="270,31,0,0" VerticalAlignment="Top" Width="75" ToolTip="Check notifications icons now and log results" Click="BtnTest_Click"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
 
     </Grid>
 </Window>
