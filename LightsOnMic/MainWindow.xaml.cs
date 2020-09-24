@@ -99,12 +99,156 @@ namespace LightsOnMic
     [SettingsSerializeAs(SettingsSerializeAs.Xml)]
     public class ALFXSettings
     {
+        /// <summary>
+        /// Whether the user has enabled use of AlienFX lighting
+        /// </summary>
+        public bool Enabled;
+        /// <summary>
+        /// User color settings for AlienFX lights
+        /// </summary>
         public StatusColors Colors;
+        
+        [NonSerialized]
+        private LightFXController controller;
+
+        /// <summary>
+        /// Indicates whether AlienFX lighting is available on this system
+        /// </summary>
+        /// <returns></returns>
+        public bool Available()
+        {
+            return (controller != null);
+        }
+
+        /// <summary>
+        /// Indicates whether AlienFX lighting is available and enabled for use by the user
+        /// </summary>
+        /// <returns></returns>
+        public bool Active()
+        {
+            return Enabled && Available();
+        }
+
 
         public ALFXSettings()
         {
+            Enabled = true;
             Colors = new StatusColors();
         }
+
+        public string InitHardware()
+        {
+            string logMsg = "";
+            // Release any existing instance
+            if (controller != null) controller.LFX_Release();
+            // Now create a new controller
+            controller = new LightFXController();
+
+            var result = controller.LFX_Initialize();
+            if (result == LFX_Result.LFX_Success)
+            {
+                // Reset lights and update
+                controller.LFX_Reset();
+                controller.LFX_Update();
+
+                logMsg = "AlienFX device initialized.";
+            }
+            else
+            {
+                switch (result)
+                {
+                    case LFX_Result.LFX_Error_NoDevs:
+                        logMsg = "There is not AlienFX device available.";
+                        break;
+                    default:
+                        logMsg = "There was an error initializing the AlienFX device.";
+                        break;
+                }
+            }
+
+            return logMsg;
+        }
+
+        public void ShutdownHardware()
+        {
+            if (Available())
+            {
+                controller.LFX_Reset();
+                controller.LFX_Update();
+
+                // Ensure any pending light commands have finished before releasing the light object
+                System.Threading.Thread.Sleep(500);
+
+                controller.LFX_Release();
+            }
+        }
+
+        /// <summary>
+        /// Set all AlienFX lights to a specified color
+        /// </summary>
+        /// <param name="color">Color to set</param>
+        private void SetAllLights(LFX_ColorStruct color)
+        {
+            if (Available())
+            {
+                controller.LFX_GetNumDevices(out uint numDevs);
+
+                for (uint devIndex = 0; devIndex < numDevs; devIndex++)
+                {
+                    controller.LFX_GetNumLights(devIndex, out uint numLights);
+
+                    for (uint lightIndex = 0; lightIndex < numLights; lightIndex++)
+                        controller.LFX_SetLightColor(devIndex, lightIndex, color);
+                }
+
+                controller.LFX_Update();
+            }
+        }
+
+        /// <summary>
+        /// Sets some AlienFX lights to a specified color
+        /// </summary>
+        /// <param name="color">Color to set</param>
+        private void SetSomeLights(LFX_ColorStruct color)
+        {
+            if (Available())
+            {
+                controller.LFX_GetNumDevices(out uint numDevs);
+                controller.LFX_Reset();
+
+                for (uint devIndex = 0; devIndex < numDevs; devIndex++)
+                {
+                    controller.LFX_GetNumLights(devIndex, out uint numLights);
+
+                    for (uint lightIndex = 0; lightIndex < numLights; lightIndex++)
+                    {
+                        // Check the light description and only set lights that are not the downlight
+                        controller.LFX_GetLightDescription(devIndex, lightIndex, out StringBuilder description, 255);
+
+                        if (!(description.ToString() == "downlight")) controller.LFX_SetLightColor(devIndex, lightIndex, color);
+                    }
+                }
+
+                controller.LFX_Update();
+            }
+        }
+
+        /// <summary>
+        /// Set AlienFX lights to in-use status
+        /// </summary>
+        public void SetInUse()
+        {
+            SetAllLights(Colors.MicInUse.ToLFX());
+        }
+
+        /// <summary>
+        /// Set AlienFX lights to not-in-use status
+        /// </summary>
+        public void SetNotInUse()
+        {
+            SetSomeLights(Colors.MicNotInUse.ToLFX());
+        }
+
     }
 
     public static class ColorHelper
@@ -142,7 +286,7 @@ namespace LightsOnMic
         /// <summary>
         /// AlienFX light controller object
         /// </summary>
-        private static LightFXController lightFX;
+        //private static LightFXController lightFX;
         /// <summary>
         /// Automation object for Shell_TrayWnd
         /// </summary>
@@ -186,13 +330,14 @@ namespace LightsOnMic
         {
             InitializeComponent();
             InitTrayHooks();
-            InitLights();
             InitNotifyIcon();
 
             if (Settings.Default.alfxSettings == null)
             {
                 Settings.Default.alfxSettings = new ALFXSettings();
             }
+
+            Settings.Default.alfxSettings.InitHardware();
 
             btnMicInUse.Background = Settings.Default.alfxSettings.Colors.MicInUse.ToBrush();
             btnMicNotInUse.Background = Settings.Default.alfxSettings.Colors.MicNotInUse.ToBrush();
@@ -238,76 +383,8 @@ namespace LightsOnMic
             Automation.AddStructureChangedEventHandler(shellTray, TreeScope.Descendants, trayEventHandler = new StructureChangedEventHandler(OnStructureChanged));
         }
 
-        /// <summary>
-        /// Initialise the AlienFX lights
-        /// </summary>
-        void InitLights()
-        {
-            lightFX = new LightFXController();
 
-            var result = lightFX.LFX_Initialize();
-            if (result == LFX_Result.LFX_Success)
-            {
-                lightFX.LFX_Reset();
-                lightFX.LFX_Update();
-            }
-            else
-            {
-                switch (result)
-                {
-                    case LFX_Result.LFX_Error_NoDevs:
-                        //Console.WriteLine("There is not AlienFX device available.");
-                        break;
-                    default:
-                        //Console.WriteLine("There was an error initializing the AlienFX device.");
-                        break;
-                }
-            }
-        }
 
-        /// <summary>
-        /// Set all AlienFX lights to a specified color
-        /// </summary>
-        /// <param name="color">Color to set</param>
-        static void SetAllLights(LFX_ColorStruct color)
-        {
-            lightFX.LFX_GetNumDevices(out uint numDevs);
-
-            for (uint devIndex = 0; devIndex < numDevs; devIndex++)
-            {
-                lightFX.LFX_GetNumLights(devIndex, out uint numLights);
-
-                for (uint lightIndex = 0; lightIndex < numLights; lightIndex++)
-                    lightFX.LFX_SetLightColor(devIndex, lightIndex, color);
-            }
-
-            lightFX.LFX_Update();
-        }
-
-        /// <summary>
-        /// Sets some AlienFX lights to a specified color
-        /// </summary>
-        /// <param name="color">Color to set</param>
-        static void SetSomeLights(LFX_ColorStruct color)
-        {
-            lightFX.LFX_GetNumDevices(out uint numDevs);
-            lightFX.LFX_Reset();
-
-            for (uint devIndex = 0; devIndex < numDevs; devIndex++)
-            {
-                lightFX.LFX_GetNumLights(devIndex, out uint numLights);
-
-                for (uint lightIndex = 0; lightIndex < numLights; lightIndex++)
-                {
-                    // Check the light description and only set lights that are not the downlight
-                    lightFX.LFX_GetLightDescription(devIndex, lightIndex, out StringBuilder description, 255);
-
-                    if (!(description.ToString() == "downlight")) lightFX.LFX_SetLightColor(devIndex, lightIndex, color);
-                }
-            }
-
-            lightFX.LFX_Update();
-        }
 
         /// <summary>
         /// Initialise the notificaion icon for this application
@@ -379,13 +456,13 @@ namespace LightsOnMic
             if (iconNames.Contains(" is using your microphone\n"))
             {
                 // Trigger mic in use lights
-                SetAllLights(Settings.Default.alfxSettings.Colors.MicInUse.ToLFX());
+                Settings.Default.alfxSettings.SetInUse();
 
             }
             else
             {
                 // Trigger mic not in use lights
-                SetSomeLights(Settings.Default.alfxSettings.Colors.MicNotInUse.ToLFX());
+                Settings.Default.alfxSettings.SetNotInUse();
 
             }
 
@@ -393,10 +470,9 @@ namespace LightsOnMic
 
         }
 
-        private void button_Click(object sender, RoutedEventArgs e)
+        private void Button_Click(object sender, RoutedEventArgs e)
         {
             Settings.Default.Save();
-            Settings.Default.Reload();
 
             txtDebugLog.Text += "Found tray icons:\n" + CheckNotificationIcons();
 
@@ -423,30 +499,11 @@ namespace LightsOnMic
             }
 
             Settings.Default.Save();
-            Settings.Default.Reload();
         }
 
         private void Window_Closed(object sender, EventArgs e)
         {
-            if (!(lightFX == null))
-            {
-                try
-                {
-                    lightFX.LFX_Reset();
-                    lightFX.LFX_Update();
-
-                    // Ensure any pending light commands have finished before releasing the light object
-                    System.Windows.Application.Current.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(delegate { }));
-
-                    lightFX.LFX_Release();
-                }
-                catch
-                {
-                    // This throws external exceptions at random and the docs say it's not even required
-                };
-                
-            }
-
+            Settings.Default.alfxSettings.ShutdownHardware();
             DisposeTrayHooks();
             notifyIcon.Dispose();
         }
@@ -455,7 +512,8 @@ namespace LightsOnMic
         {
             ColorDialog colorDialog = new ColorDialog()
             {
-                Color = System.Drawing.Color.FromArgb(Settings.Default.alfxSettings.Colors.MicInUse)
+                Color = System.Drawing.Color.FromArgb(Settings.Default.alfxSettings.Colors.MicInUse),
+                
             };
 
             if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
