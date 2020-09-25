@@ -367,12 +367,14 @@ namespace LightsOnMic
         /// </summary>
         private static System.Windows.Forms.NotifyIcon notifyIcon;
 
+        private static SessionSwitchEventHandler SessionSwitchHandler;
+
         public MainWindow()
         {
             InitializeComponent();
 
             ShellEvents.InitTrayHooks(new StructureChangedEventHandler(OnStructureChanged));
-            SystemEvents.SessionSwitch += new SessionSwitchEventHandler(OnSessionSwitch);
+            SystemEvents.SessionSwitch += SessionSwitchHandler = new SessionSwitchEventHandler(OnSessionSwitch);
 
             InitNotifyIcon();
 
@@ -381,11 +383,14 @@ namespace LightsOnMic
                 Settings.Default.alfxSettings = new ALFXSettings();
             }
 
-            Settings.Default.alfxSettings.InitHardware();
+            txtDebugLog.Text += Settings.Default.alfxSettings.InitHardware();
 
             btnMicInUse.Background = Settings.Default.alfxSettings.Colors.MicInUse.ToBrush();
             btnMicNotInUse.Background = Settings.Default.alfxSettings.Colors.MicNotInUse.ToBrush();
             btnLocked.Background = Settings.Default.alfxSettings.Colors.SessionLocked.ToBrush();
+
+            CheckNotificationIcons();
+
         }
 
 
@@ -506,6 +511,12 @@ namespace LightsOnMic
             CheckNotificationIcons();
         }
 
+        private void BtnDone_Click(object sender, RoutedEventArgs e)
+        {
+            BtnApply_Click(sender, e);
+            Hide();
+        }
+
         private void ExitMenuItem_Click(object sender, EventArgs e)
         {
             ReallyExit = true;
@@ -534,6 +545,7 @@ namespace LightsOnMic
         {
             Settings.Default.alfxSettings.ShutdownHardware();
             ShellEvents.DisposeTrayHooks();
+            SystemEvents.SessionSwitch -= SessionSwitchHandler;
             notifyIcon.Dispose();
         }
 
@@ -603,5 +615,6 @@ namespace LightsOnMic
             }
 
         }
+
     }
 }

@@ -5,22 +5,19 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LightsOnMic"
         mc:Ignorable="d"
-        Title="LightsOnMic Settings" Height="292.264" Width="387.289" Closing="Window_Closing" Closed="Window_Closed" Icon="AppIcon.ico" StateChanged="Window_StateChanged" Visibility="Hidden">
+        Title="LightsOnMic Settings" Height="262.187" Width="390.052" Closing="Window_Closing" Closed="Window_Closed" Icon="AppIcon.ico" StateChanged="Window_StateChanged" MinWidth="310" MinHeight="235" Visibility="Hidden">
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="149*"/>
-            <ColumnDefinition Width="153*"/>
-        </Grid.ColumnDefinitions>
-        <TabControl x:Name="tabControl" Grid.ColumnSpan="2" Margin="10,10,9.8,9.8">
+        <TabControl x:Name="tabControl" Grid.ColumnSpan="2" Margin="10,10,9.8,9.4">
             <TabItem Header="Light Settings">
                 <Grid Background="#FFE5E5E5">
-                    <Button x:Name="btnApply" Content="Apply" Margin="0,0,10.2,10.4" Click="BtnApply_Click" Height="19" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="75"/>
+                    <Button x:Name="btnApply" Content="_Apply" Margin="0,0,10.2,10.4" Click="BtnApply_Click" Height="19" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="75"/>
                     <Button x:Name="btnMicInUse" Content="" HorizontalAlignment="Left" Margin="193,34,0,0" VerticalAlignment="Top" Width="75" Click="BtnMicInUse_Click" />
                     <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,35,0,0" TextWrapping="Wrap" Text="Light color when mic in use:" VerticalAlignment="Top"/>
                     <Button x:Name="btnMicNotInUse" Content="" HorizontalAlignment="Left" Margin="193,58,0,0" VerticalAlignment="Top" Width="75"  Click="BtnMicNotInUse_Click"/>
                     <TextBlock x:Name="textBlock1" HorizontalAlignment="Left" Margin="10,59,0,0" TextWrapping="Wrap" Text="Light color when mic not in use:" VerticalAlignment="Top"/>
                     <Button x:Name="btnLocked" Content="" HorizontalAlignment="Left" Margin="193,82,0,0" VerticalAlignment="Top" Width="75" Click="BtnLocked_Click"/>
                     <TextBlock x:Name="textBlock2" HorizontalAlignment="Left" Margin="10,84,0,0" TextWrapping="Wrap" Text="Light color when console locked:" VerticalAlignment="Top"/>
+                    <Button x:Name="btnDone" Content="_Done" Margin="0,0,90.2,10.2" HorizontalAlignment="Right" Width="75" Height="19" VerticalAlignment="Bottom" Click="BtnDone_Click"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Advanced">
