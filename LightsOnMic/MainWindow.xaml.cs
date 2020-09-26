@@ -21,6 +21,7 @@ using System.Windows.Interop;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using LightsOnMic.Properties;
+using System.Timers;
 
 namespace LightsOnMic
 {
@@ -88,6 +89,12 @@ namespace LightsOnMic
         /// </summary>
         public int SessionLocked;
 
+        /// <summary>
+        /// Sets the mic in use status to blink when active
+        /// </summary>
+        public bool BlinkMicInUse;
+        //public bool BlinkMicNotInUse;
+        //public bool BlinkSessionLocked;
 
         public StatusColors()
         {
@@ -95,6 +102,8 @@ namespace LightsOnMic
             MicInUse = System.Drawing.Color.Red.ToArgb();
             MicNotInUse = System.Drawing.Color.FromArgb(0, 190, 0).ToArgb();
             SessionLocked = System.Drawing.Color.Yellow.ToArgb();
+
+            BlinkMicInUse = false;
         }
 
     }
@@ -135,6 +144,33 @@ namespace LightsOnMic
             return Enabled && Available();
         }
 
+        /// <summary>
+        /// Current color to blink with
+        /// </summary>
+        [NonSerialized]
+        private int currentColor;
+
+        /// <summary>
+        /// Timer object for light blink
+        /// </summary>
+        [NonSerialized]
+        private System.Timers.Timer blinkTimer;
+
+        /// <summary>
+        /// Indicates whether a blinking light is currently in the high or low brightness state
+        /// </summary>
+        [NonSerialized]
+        private bool blinkHigh;
+
+        // Low brightness value for blinking
+        [NonSerialized] 
+        private const byte blinkLowBrightness = 32;
+
+        /// <summary>
+        /// Number of ms for low blink state
+        /// </summary>
+        private const int blinkPeriod = 1250;
+
 
         public ALFXSettings()
         {
@@ -144,7 +180,7 @@ namespace LightsOnMic
 
         public string InitHardware()
         {
-            string logMsg = "";
+            string logMsg;
             // Release any existing instance
             if (controller != null) controller.LFX_Release();
             // Now create a new controller
@@ -175,8 +211,13 @@ namespace LightsOnMic
             return logMsg;
         }
 
+        /// <summary>
+        /// Shutdown AlienFX lighting
+        /// </summary>
         public void ShutdownHardware()
         {
+            StopBlink();
+
             if (Available())
             {
                 controller.LFX_Reset();
@@ -193,7 +234,7 @@ namespace LightsOnMic
         /// Set all AlienFX lights to a specified color
         /// </summary>
         /// <param name="color">Color to set</param>
-        private void SetAllLights(LFX_ColorStruct color)
+        private void SetAllLights(int color, byte brightness = 255)
         {
             if (Available())
             {
@@ -204,7 +245,7 @@ namespace LightsOnMic
                     controller.LFX_GetNumLights(devIndex, out uint numLights);
 
                     for (uint lightIndex = 0; lightIndex < numLights; lightIndex++)
-                        controller.LFX_SetLightColor(devIndex, lightIndex, color);
+                        controller.LFX_SetLightColor(devIndex, lightIndex, color.ToLFX(brightness));
                 }
 
                 controller.LFX_Update();
@@ -212,10 +253,44 @@ namespace LightsOnMic
         }
 
         /// <summary>
+        /// Blink lights with the current color
+        /// </summary>
+        private void BlinkAllLights()
+        {
+            if (Available())
+            {
+                if (blinkTimer == null)
+                {
+                    blinkTimer = new System.Timers.Timer(blinkPeriod);
+                    blinkTimer.Elapsed += BlinkTimer_Elapsed;
+                }
+                
+                blinkHigh = true;
+                blinkTimer.Start();
+            }
+        }
+
+        private void BlinkTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            blinkHigh = !blinkHigh;
+            if (blinkHigh)
+            {
+                //blinkTimer.Interval = blinkPeriod * 2;
+                SetAllLights(currentColor);
+            }
+            else
+            {
+                //blinkTimer.Interval = blinkPeriod;
+                SetAllLights(currentColor, blinkLowBrightness);
+            }
+            
+        }
+
+        /// <summary>
         /// Sets some AlienFX lights to a specified color
         /// </summary>
         /// <param name="color">Color to set</param>
-        private void SetSomeLights(LFX_ColorStruct color)
+        private void SetSomeLights(int color)
         {
             if (Available())
             {
@@ -231,7 +306,7 @@ namespace LightsOnMic
                         // Check the light description and only set lights that are not the downlight
                         controller.LFX_GetLightDescription(devIndex, lightIndex, out StringBuilder description, 255);
 
-                        if (!(description.ToString() == "downlight")) controller.LFX_SetLightColor(devIndex, lightIndex, color);
+                        if (!(description.ToString() == "downlight")) controller.LFX_SetLightColor(devIndex, lightIndex, color.ToLFX());
                     }
                 }
 
@@ -240,11 +315,22 @@ namespace LightsOnMic
         }
 
         /// <summary>
+        /// Stop blinking the lights
+        /// </summary>
+        private void StopBlink()
+        {
+            if (blinkTimer != null) blinkTimer.Stop();
+        }
+
+        /// <summary>
         /// Set AlienFX lights to in-use status
         /// </summary>
         public void SetInUse()
         {
-            SetAllLights(Colors.MicInUse.ToLFX());
+            StopBlink();
+            currentColor = Colors.MicInUse;
+            SetAllLights(Colors.MicInUse);
+            if (Colors.BlinkMicInUse) BlinkAllLights();
         }
 
         /// <summary>
@@ -252,7 +338,9 @@ namespace LightsOnMic
         /// </summary>
         public void SetNotInUse()
         {
-            SetSomeLights(Colors.MicNotInUse.ToLFX());
+            StopBlink();
+            currentColor = Colors.MicNotInUse;
+            SetSomeLights(Colors.MicNotInUse);
         }
 
         /// <summary>
@@ -260,7 +348,9 @@ namespace LightsOnMic
         /// </summary>
         public void SetLocked()
         {
-            SetSomeLights(Colors.SessionLocked.ToLFX());
+            StopBlink();
+            currentColor = Colors.SessionLocked;
+            SetSomeLights(Colors.SessionLocked);
         }
 
     }
@@ -282,11 +372,12 @@ namespace LightsOnMic
         /// Convert an argb value to an LFX_ColorStruct for use with AlienFX
         /// </summary>
         /// <param name="argbColor">argb value to convert</param>
+        /// <param name="brightness">brightness value (0-255)</param>
         /// <returns></returns>
-        public static LFX_ColorStruct ToLFX(this int argbColor)
+        public static LFX_ColorStruct ToLFX(this int argbColor, byte brightness = 255)
         {
             var color = System.Drawing.Color.FromArgb(argbColor);
-            return new LFX_ColorStruct(255, color.R, color.G, color.B);
+            return new LFX_ColorStruct(brightness, color.R, color.G, color.B);
         }
 
     }
@@ -388,6 +479,8 @@ namespace LightsOnMic
             btnMicInUse.Background = Settings.Default.alfxSettings.Colors.MicInUse.ToBrush();
             btnMicNotInUse.Background = Settings.Default.alfxSettings.Colors.MicNotInUse.ToBrush();
             btnLocked.Background = Settings.Default.alfxSettings.Colors.SessionLocked.ToBrush();
+
+            chkInUseBlink.IsChecked = Settings.Default.alfxSettings.Colors.BlinkMicInUse;
 
             CheckNotificationIcons();
 
@@ -616,5 +709,9 @@ namespace LightsOnMic
 
         }
 
+        private void chkInUseBlink_Changed(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.alfxSettings.Colors.BlinkMicInUse = (bool)chkInUseBlink.IsChecked;
+        }
     }
 }
