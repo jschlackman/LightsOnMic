@@ -18,6 +18,7 @@ using System.Windows.Automation;
 using Microsoft.Win32;
 using LightFX;
 using System.Windows.Interop;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using LightsOnMic.Properties;
@@ -69,6 +70,76 @@ namespace LightsOnMic
             return element;
         }
 
+    }
+
+    // Text resource code adapted from https://www.martinstoeckli.ch/csharp/csharp.html#windows_text_resources
+
+    /// <summary>
+    /// Searches for a text resource in a Windows library, allowing use of existing Windows resources for language independence.
+    /// </summary>
+    internal class WindowsStrings
+    {
+
+        /// <summary>
+        /// Searches for a text resource in a Windows library.
+        /// </summary>
+        /// <example>
+        ///   btnCancel.Text = WindowsStrings.Load("user32.dll", 801, "Cancel");
+        ///   btnYes.Text = WindowsStrings.Load("user32.dll", 805, "Yes");
+        /// </example>
+        /// <param name="libraryName">Name of the windows library, e.g. "user32.dll" or "shell32.dll"</param>
+        /// <param name="ident">ID of the string resource.</param>
+        /// <param name="defaultText">Return this text, if the resource string could not be found.</param>
+        /// <returns>Requested string if the resource was found, otherwise the <paramref name="defaultText"/></returns>
+        private static string Load(IntPtr libraryHandle, uint ident, string defaultText)
+        {
+            if (libraryHandle != IntPtr.Zero)
+            {
+                StringBuilder sb = new StringBuilder(1024);
+                int size = LoadString(libraryHandle, ident, sb, 1024);
+                if (size > 0)
+                    return sb.ToString();
+            }
+            return defaultText;
+        }
+
+        /// <summary>
+        /// Gets a list of known strings that may be used to indicate the microphone is in use.
+        /// </summary>
+        /// <returns></returns>
+        public static List<string> GetMicUseStrings()
+        {
+            List<string> moduleStrings = new List<string>();
+
+            // Get a new handle to the external library containing strings used for the mic in use notification
+            IntPtr libraryHandle = LoadLibrary("sndvolsso.dll");
+
+            if (libraryHandle != IntPtr.Zero)
+            {
+                // Load each known string resource (using en-US defaults if not found)
+                moduleStrings.Add(Load(libraryHandle, 2045, "Your microphone is currently in use"));
+                moduleStrings.Add(Load(libraryHandle, 2046, "%1 is using your microphone").Remove(0, 3));
+                moduleStrings.Add(Load(libraryHandle, 2047, "%1 apps are using your microphone").Remove(0, 3));
+                moduleStrings.Add(Load(libraryHandle, 2052, "1 app is using your microphone"));
+
+                // Free handle to external library
+                FreeLibrary("sndvolsso.dll");
+            }
+
+            return moduleStrings;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr LoadLibrary(string lpModuleName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr FreeLibrary(string lpModuleName);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern int LoadString(IntPtr hInstance, uint uID, StringBuilder lpBuffer, int nBufferMax);
     }
 
     /// <summary>
@@ -200,7 +271,7 @@ namespace LightsOnMic
                 switch (result)
                 {
                     case LFX_Result.LFX_Error_NoDevs:
-                        logMsg = "There is not AlienFX device available.";
+                        logMsg = "There is no AlienFX device available.";
                         break;
                     default:
                         logMsg = "There was an error initializing the AlienFX device.";
@@ -454,6 +525,11 @@ namespace LightsOnMic
         private bool ReallyExit = false;
 
         /// <summary>
+        /// String values used by notification icons that indicate the microphone is in use.
+        /// </summary>
+        private List<string> InUseText = new List<string>();
+
+        /// <summary>
         /// Notification icon for this application
         /// </summary>
         private static System.Windows.Forms.NotifyIcon notifyIcon;
@@ -474,6 +550,8 @@ namespace LightsOnMic
                 Settings.Default.alfxSettings = new ALFXSettings();
             }
 
+            InUseText = WindowsStrings.GetMicUseStrings();
+            
             txtDebugLog.Text += Settings.Default.alfxSettings.InitHardware();
 
             btnMicInUse.Background = Settings.Default.alfxSettings.Colors.MicInUse.ToBrush();
@@ -515,7 +593,7 @@ namespace LightsOnMic
         }
 
         /// <summary>
-        /// Initialise the notificaion icon for this application
+        /// Initialise the notification icon for this application
         /// </summary>
         private void InitNotifyIcon()
         {
@@ -581,7 +659,8 @@ namespace LightsOnMic
                 }
             }
 
-            if (iconNames.Contains(" is using your microphone\n"))
+            // Check if any of the in use strings are currently being displayed by a notification icon
+            if (InUseText.Any(s => iconNames.Contains(s + "\n")))
             {
                 // Trigger mic in use lights
                 Settings.Default.alfxSettings.SetInUse();
