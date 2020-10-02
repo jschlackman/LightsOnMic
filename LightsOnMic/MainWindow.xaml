@@ -5,20 +5,62 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LightsOnMic"
         mc:Ignorable="d"
-        Title="LightsOnMic Settings" Height="262.187" Width="390.052" Closing="Window_Closing" Closed="Window_Closed" Icon="AppIcon.ico" StateChanged="Window_StateChanged" MinWidth="310" MinHeight="235" Visibility="Hidden">
-    <Grid>
-        <TabControl x:Name="tabControl" Grid.ColumnSpan="2" Margin="10,10,9.8,9.4">
+        Title="LightsOnMic Settings" Height="280.587" Width="840.452" Closing="Window_Closing" Closed="Window_Closed" Icon="AppIcon.ico" StateChanged="Window_StateChanged" MinWidth="310" MinHeight="235">
+    <Grid Margin="0,0,-6.4,0.2">
+        <TabControl x:Name="tabControl" Grid.ColumnSpan="2" Margin="10,10,10.4,9">
             <TabItem Header="Light Settings">
                 <Grid Background="#FFE5E5E5">
                     <Button x:Name="btnApply" Content="_Apply" Margin="0,0,10.2,10.4" Click="BtnApply_Click" Height="19" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="75"/>
-                    <Button x:Name="btnMicInUse" Content="" HorizontalAlignment="Left" Margin="193,34,0,0" VerticalAlignment="Top" Width="75" Click="BtnMicInUse_Click" />
-                    <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,35,0,0" TextWrapping="Wrap" Text="Light color when mic in use:" VerticalAlignment="Top"/>
-                    <Button x:Name="btnMicNotInUse" Content="" HorizontalAlignment="Left" Margin="193,58,0,0" VerticalAlignment="Top" Width="75"  Click="BtnMicNotInUse_Click"/>
-                    <TextBlock x:Name="textBlock1" HorizontalAlignment="Left" Margin="10,59,0,0" TextWrapping="Wrap" Text="Light color when mic not in use:" VerticalAlignment="Top"/>
-                    <Button x:Name="btnLocked" Content="" HorizontalAlignment="Left" Margin="193,82,0,0" VerticalAlignment="Top" Width="75" Click="BtnLocked_Click"/>
-                    <TextBlock x:Name="textBlock2" HorizontalAlignment="Left" Margin="10,84,0,0" TextWrapping="Wrap" Text="Light color when console locked:" VerticalAlignment="Top"/>
+                    <Button x:Name="btnMicInUse" Content="" HorizontalAlignment="Left" Margin="52,46,0,0" VerticalAlignment="Top" Width="75" Click="BtnMicInUse_Click" />
+                    <Button x:Name="btnMicNotInUse" Content="" HorizontalAlignment="Left" Margin="338,46,0,0" VerticalAlignment="Top" Width="75"  Click="BtnMicNotInUse_Click"/>
+                    <Button x:Name="btnLocked" Content="" HorizontalAlignment="Left" Margin="596,46,0,0" VerticalAlignment="Top" Width="75" Click="BtnLocked_Click"/>
                     <Button x:Name="btnDone" Content="_Done" Margin="0,0,90.2,10.2" HorizontalAlignment="Right" Width="75" Height="19" VerticalAlignment="Bottom" Click="BtnDone_Click"/>
-                    <CheckBox x:Name="chkInUseBlink" Content="Blink" HorizontalAlignment="Left" Margin="279,36,0,0" VerticalAlignment="Top" Checked="chkInUseBlink_Changed" Unchecked="chkInUseBlink_Changed"/>
+                    <CheckBox x:Name="chkInUseBlink" Content="Blink" HorizontalAlignment="Left" Margin="132,49,0,0" VerticalAlignment="Top" Checked="ChkInUseBlink_Changed" Unchecked="ChkInUseBlink_Changed"/>
+                    <TreeView x:Name="treeView" ItemsSource="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=Lights}" Margin="10,74,0,0" Height="96" VerticalAlignment="Top" HorizontalAlignment="Left" Width="253">
+                        <TreeView.Resources>
+                            <HierarchicalDataTemplate DataType="{x:Type local:RGBLightGroup}" ItemsSource="{Binding Members}" >
+                                <CheckBox Content="{Binding Description}" IsChecked="{Binding Path=(local:ItemHelper.IsChecked), Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" >
+                                    <CheckBox.Style>
+                                        <Style TargetType="{x:Type CheckBox}">
+                                            <Setter Property="Foreground" Value="Black"/>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Path=(local:ItemHelper.IsChecked)}" Value="False" >
+                                                    <Setter Property="Foreground" Value="LightGray"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
+                            </HierarchicalDataTemplate>
+                            <DataTemplate DataType="{x:Type local:RGBLight}" >
+                                <CheckBox Content="{Binding Description}" IsChecked="{Binding Path=(local:ItemHelper.IsChecked), Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" >
+                                    <CheckBox.Style>
+                                        <Style TargetType="{x:Type CheckBox}">
+                                            <Setter Property="Foreground" Value="Black"/>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Path=(local:ItemHelper.IsChecked)}" Value="False" >
+                                                    <Setter Property="Foreground" Value="LightGray"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
+                            </DataTemplate>
+                        </TreeView.Resources>
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="{x:Type TreeViewItem}">
+                                <Setter Property="IsExpanded" Value="True"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                    </TreeView>
+                    <Label x:Name="label" Content="Microphone In Use" HorizontalAlignment="Left" Margin="10,16,0,0" VerticalAlignment="Top" FontWeight="Bold"/>
+                    <Label x:Name="label1" Content="Color:" HorizontalAlignment="Left" Margin="10,43,0,0" VerticalAlignment="Top"/>
+                    <Label x:Name="label_Copy" Content="Microphone Not Use" HorizontalAlignment="Left" Margin="296,16,0,0" VerticalAlignment="Top" FontWeight="Bold"/>
+                    <Label x:Name="label1_Copy" Content="Color:" HorizontalAlignment="Left" Margin="296,43,0,0" VerticalAlignment="Top"/>
+                    <Label x:Name="label_Copy1" Content="Console Locked" HorizontalAlignment="Left" Margin="554,16,0,0" VerticalAlignment="Top" FontWeight="Bold"/>
+                    <Label x:Name="label1_Copy1" Content="Color:" HorizontalAlignment="Left" Margin="554,43,0,0" VerticalAlignment="Top"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Advanced">

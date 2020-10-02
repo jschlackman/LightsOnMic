@@ -23,6 +23,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using LightsOnMic.Properties;
 using System.Timers;
+using System.Collections.ObjectModel;
 
 namespace LightsOnMic
 {
@@ -302,6 +303,55 @@ namespace LightsOnMic
         }
 
         /// <summary>
+        /// Gets the descriptions of all currently connected AlienFX lights grouped by device
+        /// </summary>
+        /// <returns></returns>
+        public List<RGBLightGroup> GetConnectedLights()
+        {
+            List<RGBLightGroup> ltDevices = new List<RGBLightGroup>();
+
+            if (Available())
+            {
+                LFX_Result result;
+                controller.LFX_GetNumDevices(out uint numDevices);
+
+                for (uint devIndex = 0; devIndex < numDevices; devIndex++)
+                {
+                    StringBuilder description;
+                    result = controller.LFX_GetDeviceDescription(devIndex, out description, 255, out LFX_DeviceType devType);
+                    if (result == LFX_Result.LFX_Success)
+                    {
+                        RGBLightGroup ltDevice = new RGBLightGroup() { Description = description.ToString(), Members = new List<RGBLight>() };
+
+                        // Enumerate lights connected to this device
+                        result = controller.LFX_GetNumLights(devIndex, out uint numLights);
+                        if (result == LFX_Result.LFX_Success)
+                        {
+                            for (uint lightIndex = 0; lightIndex < numLights; lightIndex++)
+                            {
+                                result = controller.LFX_GetLightDescription(devIndex, lightIndex, out description, 255);
+                                if (result == LFX_Result.LFX_Success)
+                                {
+                                    RGBLight ltLight = new RGBLight() { Description = description.ToString() };
+                                    ltLight.SetValue(ItemHelper.ParentProperty, ltDevice);
+                                    ltDevice.Members.Add(ltLight);
+                                }
+                            }
+                        }
+
+                        // Add this device if we got the name of at least 1 light
+                        if (ltDevice.Members.Count > 0)
+                        {
+                            ltDevices.Add(ltDevice);
+                        }
+                    }
+                }
+            }
+
+            return ltDevices;
+        }
+
+        /// <summary>
         /// Set all AlienFX lights to a specified color
         /// </summary>
         /// <param name="color">Color to set</param>
@@ -453,6 +503,69 @@ namespace LightsOnMic
 
     }
 
+
+    public class RGBLightGroup : DependencyObject
+    {
+        public string Description { get; set; }
+        public List<RGBLight> Members { get; set; }
+    }
+
+    public class RGBLight : DependencyObject
+    {
+        public string Description { get; set; }
+        public bool SetLight { get; set; }
+    }
+
+    public class ItemHelper : DependencyObject
+    {
+        public static readonly DependencyProperty IsCheckedProperty = DependencyProperty.RegisterAttached("IsChecked", typeof(bool?), typeof(ItemHelper), new PropertyMetadata(false, new PropertyChangedCallback(OnIsCheckedPropertyChanged)));
+        private static void OnIsCheckedPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is RGBLightGroup && ((bool?)e.NewValue).HasValue)
+                foreach (RGBLight p in (d as RGBLightGroup).Members)
+                    ItemHelper.SetIsChecked(p, (bool?)e.NewValue);
+
+            if (d is RGBLight)
+            {
+                RGBLight lt = d as RGBLight;
+                lt.SetLight = (bool)e.NewValue;
+
+                int rgbChecked = (lt.GetValue(ItemHelper.ParentProperty) as RGBLightGroup).Members.Where(x => ItemHelper.GetIsChecked(x) == true).Count();
+                int rgbUnchecked = (lt.GetValue(ItemHelper.ParentProperty) as RGBLightGroup).Members.Where(x => ItemHelper.GetIsChecked(x) == false).Count();
+                if (rgbChecked > 0 && rgbUnchecked > 0)
+                {
+                    ItemHelper.SetIsChecked(lt.GetValue(ItemHelper.ParentProperty) as DependencyObject, null);
+                    return;
+                }
+                if (rgbChecked > 0)
+                {
+                    ItemHelper.SetIsChecked(lt.GetValue(ItemHelper.ParentProperty) as DependencyObject, true);
+                    return;
+                }
+                ItemHelper.SetIsChecked(lt.GetValue(ItemHelper.ParentProperty) as DependencyObject, false);
+                }
+                }
+                public static void SetIsChecked(DependencyObject element, bool? IsChecked)
+                {
+                    element.SetValue(ItemHelper.IsCheckedProperty, IsChecked);
+                }
+                public static bool? GetIsChecked(DependencyObject element)
+                {
+                    return (bool?)element.GetValue(ItemHelper.IsCheckedProperty);
+                }
+
+        public static readonly DependencyProperty ParentProperty = DependencyProperty.RegisterAttached("Parent", typeof(object), typeof(ItemHelper));
+        public static void SetParent(DependencyObject element, object Parent)
+        {
+            element.SetValue(ItemHelper.ParentProperty, Parent);
+        }
+        public static object GetParent(DependencyObject element)
+        {
+            return (object)element.GetValue(ItemHelper.ParentProperty);
+        }
+    }
+
+
     public static class ShellEvents
     {
         /// <summary>
@@ -527,7 +640,7 @@ namespace LightsOnMic
         /// <summary>
         /// String values used by notification icons that indicate the microphone is in use.
         /// </summary>
-        private List<string> InUseText = new List<string>();
+        private readonly List<string> InUseText;
 
         /// <summary>
         /// Notification icon for this application
@@ -535,6 +648,9 @@ namespace LightsOnMic
         private static System.Windows.Forms.NotifyIcon notifyIcon;
 
         private static SessionSwitchEventHandler SessionSwitchHandler;
+
+        public ObservableCollection<RGBLightGroup> Lights { get; set; }
+
 
         public MainWindow()
         {
@@ -559,6 +675,9 @@ namespace LightsOnMic
             btnLocked.Background = Settings.Default.alfxSettings.Colors.SessionLocked.ToBrush();
 
             chkInUseBlink.IsChecked = Settings.Default.alfxSettings.Colors.BlinkMicInUse;
+
+            // Load current lights into treeview
+            Lights = new ObservableCollection<RGBLightGroup>(Settings.Default.alfxSettings.GetConnectedLights());
 
             CheckNotificationIcons();
 
@@ -788,7 +907,7 @@ namespace LightsOnMic
 
         }
 
-        private void chkInUseBlink_Changed(object sender, RoutedEventArgs e)
+        private void ChkInUseBlink_Changed(object sender, RoutedEventArgs e)
         {
             Settings.Default.alfxSettings.Colors.BlinkMicInUse = (bool)chkInUseBlink.IsChecked;
         }
