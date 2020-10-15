@@ -651,6 +651,8 @@ namespace LightsOnMic
 
         public ObservableCollection<RGBLightGroup> Lights { get; set; }
 
+        private const string regWindowsRunKey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+        private const string regProgramValue = "LightsOnMic";
 
         public MainWindow()
         {
@@ -675,6 +677,9 @@ namespace LightsOnMic
             btnLocked.Background = Settings.Default.alfxSettings.Colors.SessionLocked.ToBrush();
 
             chkInUseBlink.IsChecked = Settings.Default.alfxSettings.Colors.BlinkMicInUse;
+
+            // Check if program is correctly set to run at logon
+            chkStartAtLogon.IsChecked = (Registry.CurrentUser.OpenSubKey(regWindowsRunKey).GetValue(regProgramValue,"").ToString() == "\"" + System.Windows.Forms.Application.ExecutablePath + "\"");
 
             // Load current lights into treeview
             Lights = new ObservableCollection<RGBLightGroup>(Settings.Default.alfxSettings.GetConnectedLights());
@@ -911,5 +916,26 @@ namespace LightsOnMic
         {
             Settings.Default.alfxSettings.Colors.BlinkMicInUse = (bool)chkInUseBlink.IsChecked;
         }
+
+        private void ChkStartAtLogon_Changed(object sender, RoutedEventArgs e)
+        {
+            // Get reference to the current user's Windows Run key with edit permissions
+            RegistryKey windowsRun = Registry.CurrentUser.OpenSubKey(regWindowsRunKey, true);
+
+            // If checked, set the correct registry value
+            if ((bool)chkStartAtLogon.IsChecked)
+            {
+                windowsRun.SetValue(regProgramValue, "\"" + System.Windows.Forms.Application.ExecutablePath + "\"");
+            }
+            else
+            {
+                // Check for the presence of the startup registry value and remove it
+                if (windowsRun.GetValue(regProgramValue) != null)
+                {
+                    windowsRun.DeleteValue(regProgramValue);
+                }
+            }
+        }
+
     }
 }
